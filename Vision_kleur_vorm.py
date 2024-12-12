@@ -42,6 +42,15 @@ def get_white_mask(hsv_image):
     upper = np.array([180, 20, 255])
     return cv2.inRange(hsv_image, lower, upper)
 
+# Normaliseer de rotatiehoek naar het bereik van 0 tot 360 graden
+def normalize_angle(angle):
+    # Zorg ervoor dat de hoek altijd tussen 0 en 360 ligt
+    if angle < 0:
+        angle += 360
+    elif angle >= 360:
+        angle -= 360
+    return angle
+
 # Verwerk het frame
 def process_frame(frame, min_area=1000):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
@@ -77,22 +86,14 @@ def process_frame(frame, min_area=1000):
                         min_rect = cv2.minAreaRect(contour)
                         angle = min_rect[2]
 
-                        if angle < -45:
-                            angle = 90 + angle
-                        elif angle > 45:
-                            angle = angle
-                        else:
-                            angle = 90 + angle
+                        # Normaliseer de hoek naar het bereik 0-360 graden
+                        angle = normalize_angle(angle)
                     else:
                         # Vierkant of rechthoek
                         rect = cv2.minAreaRect(contour)
                         angle = rect[2]
-                        if angle < -45:
-                            angle = 90 + angle
-                        elif angle > 45:
-                            angle = angle
-                        else:
-                            angle = 90 + angle
+                        # Normaliseer de hoek naar het bereik 0-360 graden
+                        angle = normalize_angle(angle)
 
                     # Teken de contouren en label met positie en rotatie
                     cv2.drawContours(output_frame, [contour], -1, (0, 255, 0), 2)
@@ -149,3 +150,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
