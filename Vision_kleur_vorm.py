@@ -1,9 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Thu Dec 12 10:38:43 2024
-
-@author: tycho
-"""
 import cv2
 import numpy as np
 import time
@@ -53,7 +47,7 @@ def process_frame(frame, min_area=1000):
     hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     output_frame = frame.copy()
 
-    detected_piece = None
+    detected_pieces = []
 
     for color_name, hue_range in COLOR_RANGES.items():
         # Speciaal masker voor wit
@@ -69,23 +63,46 @@ def process_frame(frame, min_area=1000):
             # Sorteer contouren op grootte (van groot naar klein)
             contours = sorted(contours, key=cv2.contourArea, reverse=True)
 
-            # Pak de grootste contour
-            largest_contour = contours[0]
-            area = cv2.contourArea(largest_contour)
+            for contour in contours:
+                area = cv2.contourArea(contour)
 
-            if area > min_area:
-                shape = detect_shape(largest_contour)
-                x, y, w, h = cv2.boundingRect(largest_contour)
+                if area > min_area:
+                    shape = detect_shape(contour)
+                    x, y, w, h = cv2.boundingRect(contour)
 
-                # Teken contouren en label
-                cv2.drawContours(output_frame, [largest_contour], -1, (0, 255, 0), 2)
-                cv2.putText(output_frame, f"{color_name} {shape}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    # Bepaal de rotatie van de contour (ongeacht de vorm)
+                    # Gebruik de grootste zijde om de rotatiehoek te berekenen
+                    if shape == "Driehoek" or shape == "Parallellogram":
+                        # Bereken de hoeken van de lijnen in de contour
+                        min_rect = cv2.minAreaRect(contour)
+                        angle = min_rect[2]
 
-                # Sla de gedetecteerde kleur en vorm op
-                detected_piece = (color_name, shape)
-                break
+                        if angle < -45:
+                            angle = 90 + angle
+                        elif angle > 45:
+                            angle = angle
+                        else:
+                            angle = 90 + angle
+                    else:
+                        # Vierkant of rechthoek
+                        rect = cv2.minAreaRect(contour)
+                        angle = rect[2]
+                        if angle < -45:
+                            angle = 90 + angle
+                        elif angle > 45:
+                            angle = angle
+                        else:
+                            angle = 90 + angle
 
-    return output_frame, detected_piece
+                    # Teken de contouren en label met positie en rotatie
+                    cv2.drawContours(output_frame, [contour], -1, (0, 255, 0), 2)
+                    cv2.putText(output_frame, f"{color_name} {shape}", (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                    cv2.putText(output_frame, f"Pos: ({x},{y}) Rot: {angle:.2f}", (x, y + h + 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+
+                    # Sla de gedetecteerde kleur, vorm, positie en rotatie op
+                    detected_pieces.append((color_name, shape, (x, y), angle))
+
+    return output_frame, detected_pieces
 
 # Main-functie
 def main():
@@ -110,15 +127,15 @@ def main():
             print("Error: Frame niet gelezen!")
             break
 
-        processed_frame, detected_piece = process_frame(frame, min_area)
+        processed_frame, detected_pieces = process_frame(frame, min_area)
 
         # Toon de uitvoer
         cv2.imshow("Tangram Detectie", processed_frame)
 
-        # Print het gedetecteerde stuk
-        if detected_piece:
-            color, shape = detected_piece
-            print(f"Gedetecteerd: Kleur = {color}, Vorm = {shape}")
+        # Print de gedetecteerde blokken met positie en rotatie
+        if detected_pieces:
+            for color, shape, position, angle in detected_pieces:
+                print(f"Gedetecteerd: Kleur = {color}, Vorm = {shape}, Positie = {position}, Rotatie = {angle:.2f} graden")
 
         # Wacht op een time delay
         time.sleep(time_delay)
